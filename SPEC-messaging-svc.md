@@ -251,3 +251,53 @@ volumes:
 | `JWT_PUBLIC_KEY` | RS256 public key (PEM) | SSM Parameter Store |
 | `SQS_ACTIVITY_EVENTS_URL` | Queue URL for notification events | SSM Parameter Store |
 | `ASPNETCORE_ENVIRONMENT` | `Development` / `Production` | ECS task definition |
+
+---
+
+## 11. Implementation Notes (2026-10-24)
+
+Decisions taken while implementing; they refine the sections above.
+
+### 11.1 Starting a conversation without a synchronous call
+
+The service has no listing data and must not call the User Library Service. `POST /conversations` therefore takes the **contact token** the User Library Service returns from `GET /listings/{id}`:
+
+```json
+{ "listingId": "uuid", "contactToken": "<jwt>", "initialMessage": "string" }
+```
+
+The token is an RS256 JWT signed with the User Library key (`typ` `gx-contact+jwt`, `aud` `gamex-listing-contact`, 24 h lifetime) carrying `listing_id`, `owner_id`, `owner_name`, `owner_avatar`, `game_title`. It is verified with `JWT_PUBLIC_KEY`, so callers cannot invent a listing owner. An access token is not accepted as a contact token (different audience and type). `listingId` is optional but must match the token when sent.
+
+- Owner messaging their own listing → `400`. Invalid/expired token → `400` (`contactToken`).
+- Existing conversation for `(listingId, caller)` → `409` whose problem body includes `conversation` (the existing conversation).
+- Success → `201` with the conversation.
+
+### 11.2 Participants and names
+
+`conversations` stores display-name snapshots: `initiator_name` from the JWT `name` claim, `recipient_name`/`recipient_avatar_url` from the contact token; a participant's name is refreshed whenever they post. Additional columns: `initiator_name`, `initiator_avatar_url` (always null for now: the JWT has no avatar), `recipient_name`, `recipient_avatar_url`, `last_message_at` (orders `GET /conversations`).
+
+### 11.3 API details
+
+- `GET /conversations?cursor&pageSize` (default 20, max 50) — newest activity first; `unreadCount` counts the other party's unread messages.
+- `GET /conversations/{id}` → `{ id, listingId, gameTitle, otherUser, createdAt, unreadCount }`.
+- `GET /conversations/{id}/messages` items: `{ id, conversationId, senderId, body, sentAt, readAt, isOwn }`; `nextCursor` is the id of the oldest message on the page.
+- `PUT /conversations/{id}/read` → `204`; marks the other party's messages read and pushes `ConversationRead { conversationId }` to them (only if something changed).
+- Message bodies are trimmed; 1–2000 characters. Sending (start + post) is limited per user (`SEND_RATE_LIMIT_PER_MINUTE`, default 30).
+- Non-participants get `403` ("You are not a participant in this conversation"); unknown ids `404`.
+
+### 11.4 SignalR
+
+`MessageReceived` is pushed to **both** participants' groups (the sender's other devices stay in sync) with `{ id, conversationId, senderId, senderName, body, sentAt }`. Running several instances requires a SignalR backplane (e.g. Redis or Azure SignalR) — not configured yet.
+
+### 11.5 `message.sent` payload
+
+Enriched so the Notification Service needs no lookups: `eventType, conversationId, messageId, senderId, senderName, recipientId, listingId, gameTitle, occurredAt` (still no message body).
+
+### 11.6 Additional environment variables
+
+| Variable | Description |
+|---|---|
+| `JWT_ISSUER` / `JWT_AUDIENCE` | Expected `iss` / `aud` of access tokens (validated when set; the issuer also applies to contact tokens) |
+| `SEND_RATE_LIMIT_PER_MINUTE` | Messages per user per minute (default 30) |
+| `AWS_SERVICE_URL` / `AWS_DEFAULT_REGION` | LocalStack endpoint / region for local development |
+| `DB_MIGRATE_ON_STARTUP` | Apply migrations at startup (default true in Development) |

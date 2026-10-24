@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gamex.Messaging.Domain\Gamex.Messaging.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Application queries through IAppDbContext (EF Core abstractions only, no provider). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Gamex.Messaging.UnitTests" />
+    <InternalsVisibleTo Include="Gamex.Messaging.IntegrationTests" />
+  </ItemGroup>
+
+</Project>

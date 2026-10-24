@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Gamex.Messaging.Api/Gamex.Messaging.Api.csproj" />
+    <Project Path="src/Gamex.Messaging.Application/Gamex.Messaging.Application.csproj" />
+    <Project Path="src/Gamex.Messaging.Domain/Gamex.Messaging.Domain.csproj" />
+    <Project Path="src/Gamex.Messaging.Infrastructure/Gamex.Messaging.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Gamex.Messaging.IntegrationTests/Gamex.Messaging.IntegrationTests.csproj" />
+    <Project Path="tests/Gamex.Messaging.UnitTests/Gamex.Messaging.UnitTests.csproj" />
+  </Folder>
+</Solution>
